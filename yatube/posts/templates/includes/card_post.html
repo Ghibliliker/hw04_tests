@@ -1,0 +1,27 @@
+<div class="card mb-3 mt-1 shadow-sm">
+  <div class="card-body">
+    <p class="card-text">
+      <a href="{% url 'profile' username=username %}">
+        <strong class="d-block text-gray-dark">
+          {{ username }}
+        </strong>
+      </a>
+      {{ text|linebreaksbr }}
+    </p>
+    <div class="d-flex justify-content-between align-items-center">
+      <div class="btn-group">
+        {% if user.is_authenticated %}
+        <a class="btn btn-sm text-muted" href="{% url 'post_view' username=username post_id=id %}" role="button"> 
+          Добавить комментарий 
+        </a>
+        {% endif %}
+        <a class="btn btn-sm text-muted" href="{% url 'post_edit' username=username post_id=id %}" role="button">
+          {% if user.username == post.author.username %}
+          Редактировать
+          {% endif %}
+        </a>
+      </div>
+      <small class="text-muted">{{ pub_date|date:"d M Y" }}</small>
+    </div>
+  </div>
+</div>

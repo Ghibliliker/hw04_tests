@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Пост №{{ post.id }}{% endblock %}
+{% block content %}
+  <main role="main" class="container">
+    <div class="row">
+      {% include "includes/card_author.html" with full_name=post.author.get_full_name username=post.author.username count=post.author.posts.count %}
+      <div class="col-md-9">
+        {% include "includes/card_post.html" with username=post.author.username id=post.id pub_date=post.pub_date text=post.text %}
+      </div>
+    </div>
+  </main>
+{% endblock %} 
