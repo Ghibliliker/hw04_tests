@@ -1,6 +1,8 @@
 from django.test import TestCase, Client
+from django.urls import reverse
 
 from ..models import Post, Group, User
+from http import HTTPStatus
 
 
 class StaticURLTests(TestCase):
@@ -9,11 +11,6 @@ class StaticURLTests(TestCase):
         super().setUpClass()
         cls.user = User.objects.create_user(username='test_user')
         cls.user1 = User.objects.create_user(username='test_user1')
-        cls.guest_client = Client()
-        cls.authorized_client = Client()
-        cls.authorized_client.force_login(cls.user)
-        cls.authorized_client1 = Client()
-        cls.authorized_client1.force_login(cls.user1)
         cls.post = Post.objects.create(
             text='Тестовый текст',
             author=cls.user
@@ -24,41 +21,61 @@ class StaticURLTests(TestCase):
         )
         cls.templates_url_names = {
             'index.html': '/',
-            'group.html': '/group/test/',
+            'group.html': f'/group/{cls.group.slug}/',
             'new.html': '/new/',
         }
-        cls.url_200 = [
-            '/',
-            '/group/test/',
+        cls.url_ok_auth = [
             '/new/',
-            '/test_user/',
-            '/test_user/1/',
-            '/test_user/1/edit/'
+            f'/{cls.user.username}/{cls.post.id}/edit/'
         ]
-
+        cls.url_ok_notauth = [
+            '/',
+            f'/group/{cls.group.slug}/',
+            f'/{cls.user.username}/',
+            f'/{cls.user.username}/{cls.post.id}/',
+        ]
+        g = f'{reverse("login")}?next=/{cls.user.username}/{cls.post.id}/edit/'
         cls.redirect_notauth = {
-            '/new/': '/auth/login/?next=/new/',
-            '/test_user/1/edit/': '/auth/login/?next=/test_user/1/edit/',
+            '/new/': f'{reverse("login")}?next=/new/',
+            f'/{cls.user.username}/{cls.post.id}/edit/': g,
         }
+
+    def setUp(self):
+        self.guest_client = Client()
+        self.authorized_client = Client()
+        self.authorized_client.force_login(self.user)
+        self.authorized_client1 = Client()
+        self.authorized_client1.force_login(self.user1)
 
     def test_edit_auth(self):
         response = self.authorized_client1.get(
-            '/test_user/1/edit/',
+            f'/{self.user.username}/{self.post.id}/edit/',
             follow=True
         )
-        self.assertRedirects(response, '/test_user/1/')
+        self.assertRedirects(
+            response,
+            f'/{self.user.username}/{self.post.id}/'
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
 
     def test_redirect_notauth(self):
         for adress, redirect in self.redirect_notauth.items():
             with self.subTest(adress=adress):
                 response = self.guest_client.get(adress, follow=True)
                 self.assertRedirects(response, redirect)
+                self.assertEqual(response.status_code, HTTPStatus.OK)
 
-    def test_url(self):
-        for adress in self.url_200:
+    def test_url_auth(self):
+        for adress in self.url_ok_auth:
             with self.subTest(adress=adress):
                 response = self.authorized_client.get(adress)
-                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.status_code, HTTPStatus.OK)
+
+    def test_url_notauth(self):
+        for adress in self.url_ok_notauth:
+            with self.subTest(adress=adress):
+                response = self.guest_client.get(adress)
+                self.assertEqual(response.status_code, HTTPStatus.OK)
 
     def test_templates(self):
         for template, adress in self.templates_url_names.items():
@@ -67,5 +84,7 @@ class StaticURLTests(TestCase):
                 self.assertTemplateUsed(response, template)
 
     def test_template_edit(self):
-        response = self.authorized_client.get('/test_user/1/edit/')
+        response = self.authorized_client.get(
+            f'/{self.user.username}/{self.post.id}/edit/'
+        )
         self.assertTemplateUsed(response, 'new.html')

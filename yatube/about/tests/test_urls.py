@@ -1,6 +1,8 @@
 from django.test import Client, TestCase
 from django.urls import reverse
 
+from http import HTTPStatus
+
 
 class StaticViewsTests(TestCase):
     def setUp(self):
@@ -14,7 +16,7 @@ class StaticViewsTests(TestCase):
         for adress in self.url_template.keys():
             with self.subTest(adress=adress):
                 response = self.guest_client.get(reverse(adress))
-                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.status_code, HTTPStatus.OK)
 
     def test_page_accessible(self):
         for adress, template in self.url_template.items():
