@@ -1,8 +1,9 @@
+from http import HTTPStatus
+
 from django.test import Client, TestCase
 from django.urls import reverse
 
 from ..models import Post, Group, User
-from http import HTTPStatus
 
 
 class PostFormTests(TestCase):
@@ -10,13 +11,14 @@ class PostFormTests(TestCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.user = User.objects.create_user(username='test_user')
-        cls.post = Post.objects.create(
-            text='Тестовый текст',
-            author=cls.user
-        )
         cls.group = Group.objects.create(
             title='Test_group',
             slug='test_group'
+        )
+        cls.post = Post.objects.create(
+            text='Тестовый текст',
+            author=cls.user,
+            group=cls.group
         )
 
     def setUp(self):
@@ -34,19 +36,16 @@ class PostFormTests(TestCase):
             data=form_data,
             follow=True
         )
+        last_post = Post.objects.last()
         self.assertRedirects(response, reverse('index'))
         self.assertEqual(Post.objects.count(), post_count + 1)
         self.assertEqual(response.status_code, HTTPStatus.OK)
-        self.assertEqual(Post.objects.get(pk=2).text, form_data['text'])
-        self.assertIsNotNone(
-            Post.objects.get(pk=2).group.id,
-            form_data['group']
-        )
+        self.assertEqual(last_post.text, form_data['text'])
+        self.assertEqual(last_post.group.id, form_data['group'])
 
     def test_change_post(self):
         post_count = Post.objects.count()
         post_edit = Post.objects.get(pk=1)
-        text_start = post_edit.text
         form_data = {
             'text': 'Тестовый другой текст',
             'group': self.group.id,
@@ -63,9 +62,7 @@ class PostFormTests(TestCase):
             follow=True
         )
         post_fin = Post.objects.get(pk=1)
-        text_fin = post_fin.text
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(Post.objects.count(), post_count)
-        self.assertEqual(Post.objects.get(pk=1).text, form_data['text'])
-        self.assertEqual(Post.objects.get(pk=1).group.id, form_data['group'])
-        self.assertIsNot(text_start, text_fin)
+        self.assertEqual(post_fin.text, form_data['text'])
+        self.assertEqual(post_fin.group.id, form_data['group'])

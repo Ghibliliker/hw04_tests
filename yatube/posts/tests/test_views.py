@@ -33,19 +33,12 @@ class PostViewsTests(TestCase):
         self.authorized_client = Client()
         self.authorized_client.force_login(self.user)
 
-    def fast_check(self, response):
-        self.assertEqual(
-            response.context.get('page')[0].text,
-            self.post.text
-        )
-        self.assertEqual(
-            response.context.get('page')[0].author,
-            self.post.author
-        )
-        self.assertEqual(
-            response.context.get('page')[0].group,
-            self.post.group
-        )
+    def check_context_of_create_post(self, response):
+        create_post = response.context.get('page')[0]
+        self.assertEqual(create_post.text, self.post.text)
+        self.assertEqual(create_post.author, self.post.author)
+        self.assertEqual(create_post.group, self.post.group)
+        self.assertEqual(create_post.pub_date, self.post.pub_date)
         self.assertIn(self.post, response.context.get('page'))
 
     def test_templates_use_correct(self):
@@ -56,23 +49,27 @@ class PostViewsTests(TestCase):
 
     def test_context_use_index(self):
         response = self.authorized_client.get(reverse('index'))
-        self.fast_check(response)
+        self.check_context_of_create_post(response)
 
     def test_context_use_group(self):
         response = self.authorized_client.get(
             reverse('group_posts', kwargs={'slug': f'{self.group.slug}'})
         )
-        self.assertEqual(response.context.get('group').title, self.group.title)
-        self.assertEqual(response.context.get('group').slug, self.group.slug)
-        self.fast_check(response)
+        context_group = response.context.get('group')
+        self.assertEqual(context_group.title, self.group.title)
+        self.assertEqual(context_group.slug, self.group.slug)
+        self.check_context_of_create_post(response)
 
     def test_context_use_new(self):
         response = self.authorized_client.get(reverse('new_post'))
         form_fields = {
             'text': forms.fields.CharField,
+            'group': forms.fields.ChoiceField,
         }
-        form_field = response.context['form'].fields['text']
-        self.assertIsInstance(form_field, form_fields['text'])
+        for value, expected in form_fields.items():
+            with self.subTest(value=value):
+                form_field = response.context['form'].fields[value]
+                self.assertIsInstance(form_field, expected)
 
     def test_context_use_edit(self):
         response = self.authorized_client.get(
@@ -86,6 +83,7 @@ class PostViewsTests(TestCase):
         )
         form_fields = {
             'text': forms.fields.CharField,
+            'group': forms.fields.ChoiceField,
         }
         for value, expected in form_fields.items():
             with self.subTest(value=value):
@@ -103,7 +101,7 @@ class PostViewsTests(TestCase):
             response.context['author'].username,
             self.user.username
         )
-        self.fast_check(response)
+        self.check_context_of_create_post(response)
 
     def test_context_use_post(self):
         response = self.authorized_client.get(
@@ -115,7 +113,10 @@ class PostViewsTests(TestCase):
                 }
             )
         )
-        self.assertEqual(response.context['post'].text, f'{self.post.text}')
+        context = response.context['post']
+        self.assertEqual(context.text, f'{self.post.text}')
+        self.assertEqual(context.author.username, f'{self.post.author}')
+        self.assertEqual(context.group.title, f'{self.post.group}')
 
 
 class PaginatorViewsTest(TestCase):
@@ -148,6 +149,7 @@ class PaginatorViewsTest(TestCase):
             with self.subTest(adress=adress):
                 response = self.authorized_client.get(adress)
                 i = response.context.get('page')
+                # i.object_list.count() ни в какую не работает :(
                 self.assertEqual(i.paginator.page(1).object_list.count(), 10)
 
     def test_second_page_contains_three_records(self):
@@ -155,6 +157,7 @@ class PaginatorViewsTest(TestCase):
             with self.subTest(adress=adress):
                 response = self.authorized_client.get(adress + '?page=2')
                 i = response.context.get('page')
+                # здесь та же проблема, потому оставил старый способ
                 self.assertEqual(i.paginator.page(2).object_list.count(), 3)
 
 
@@ -183,17 +186,6 @@ class CreateViewsTests(TestCase):
         self.authorized_client = Client()
         self.authorized_client.force_login(self.user)
 
-    def fast_check(self, response):
-        self.assertEqual(response.context.get('page')[0].text, self.post.text)
-        self.assertEqual(
-            response.context.get('page')[0].author,
-            self.post.author
-        )
-        self.assertEqual(
-            response.context.get('page')[0].group,
-            self.post.group
-        )
-
     def test_group_notcontains_post(self):
         response = self.authorized_client.get(
             reverse('group_posts', kwargs={'slug': f'{self.group1.slug}'})
@@ -203,11 +195,9 @@ class CreateViewsTests(TestCase):
     def test_index_contains_post(self):
         response = self.authorized_client.get(reverse('index'))
         self.assertIn(self.post, response.context['page'])
-        self.fast_check(response)
 
     def test_group_contains_post(self):
         response = self.authorized_client.get(
             reverse('group_posts', kwargs={'slug': f'{self.group.slug}'})
         )
         self.assertIn(self.post, response.context['page'])
-        self.fast_check(response)

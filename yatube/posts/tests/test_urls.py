@@ -1,8 +1,9 @@
+from http import HTTPStatus
+
 from django.test import TestCase, Client
 from django.urls import reverse
 
 from ..models import Post, Group, User
-from http import HTTPStatus
 
 
 class StaticURLTests(TestCase):
@@ -20,9 +21,10 @@ class StaticURLTests(TestCase):
             slug='test'
         )
         cls.templates_url_names = {
-            'index.html': '/',
-            'group.html': f'/group/{cls.group.slug}/',
-            'new.html': '/new/',
+            '/': 'index.html',
+            f'/group/{cls.group.slug}/': 'group.html',
+            '/new/': 'new.html',
+            f'/{cls.user.username}/{cls.post.id}/edit/': 'new.html',
         }
         cls.url_ok_auth = [
             '/new/',
@@ -78,13 +80,7 @@ class StaticURLTests(TestCase):
                 self.assertEqual(response.status_code, HTTPStatus.OK)
 
     def test_templates(self):
-        for template, adress in self.templates_url_names.items():
+        for adress, template in self.templates_url_names.items():
             with self.subTest(adress=adress):
                 response = self.authorized_client.get(adress)
                 self.assertTemplateUsed(response, template)
-
-    def test_template_edit(self):
-        response = self.authorized_client.get(
-            f'/{self.user.username}/{self.post.id}/edit/'
-        )
-        self.assertTemplateUsed(response, 'new.html')
